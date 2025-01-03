@@ -248,120 +248,141 @@
         ?>
         
         <body>
-            <div class="container">
-                <!-- ↓↓ SIDE BAR BUTTONS ↓↓ -->
-                <div class="sidebar">
-                    <!-- NEW PAGE -->
-                    <?php if (isset($_GET['newpage'])): ?>
-                        <button type="button" onclick="submitData()">Save</button>
-                        <button onclick="window.location.href='/infosec_project/'">Cancel</button>
-
-                    <!-- NOTE -->
-                    <?php elseif (isset($_GET['note'])): ?>
-                        <button type="button" onclick="editData(<?= $_GET['note'] ?>)">Edit</button>
-                        <button type="button" onclick="deleteData(<?= $_GET['note'] ?>)">Delete</button>
-                        <button onclick="back()">Back</button>
-
-                    <!-- EDIT -->
-                    <?php elseif (isset($_GET['edit'])): ?>
-                        <button type="button" onclick="updateData(<?= $_GET['edit'] ?>)">Save</button>
-                        <button onclick="cancelEdit(<?= $_GET['edit'] ?>)">Cancel</button>
-
-                    <!-- DEFAULT -->
-                    <?php else: ?>
-                        <button onclick="window.location.href='?newpage=true'">New</button>
-                    <?php endif; ?>
-                </div>
-                <!-- ↑↑ SIDE BAR BUTTONS ↑↑ -->
-
-                <!-- ↓↓ MAIN CONTENTS ↓↓ -->
-                <div class="main-content">
-
-                    <!-- ↓↓ HEADER ↓↓ -->
-                    <div class="header">
-                        <input type="search" id="searchInput" placeholder="Search" value="<?= isset($_GET['search']) ? $_GET['search'] : ''; ?>">
-                    </div>
-                    <!-- ↑↑ HEADER ↑↑ -->
-
-                    <div class="notes-section">
-                        <!-- ↓↓ NOTES SECTION ↓↓ -->
-                        <div class="notes-list">
-                            <!-- ↓↓ NOTES HEADER & SORTER ↓↓-->
-                            <div class="notes-list-header">
-                                <div style="flex-grow: 1">
-                                    <h2>Notes</h2>
-                                </div>
-
-                                <div style="flex-grow: 1; text-align: right;">
-                                    <form>
-                                        <label for="sort">Sort By:</label>
-                                        <select name="sort" id="sort" onchange="sortBy(this)">
-                                            <option value="id_asc" <?= ($_GET['sort'] ?? '') === 'id_asc' ? 'selected' : ''; ?>>ID↑</option>
-                                            <option value="id_desc" <?= ($_GET['sort'] ?? '') === 'id_desc' ? 'selected' : ''; ?>>ID↓</option>
-                                            <option value="t_asc" <?= ($_GET['sort'] ?? '') === 't_asc' ? 'selected' : ''; ?>>Title↑</option>
-                                            <option value="t_desc" <?= ($_GET['sort'] ?? '') === 't_desc' ? 'selected' : ''; ?>>Title↓</option>
-                                        </select>
-                                    </form>
-                                </div>
-                            </div>
-                            <!-- ↑↑ NOTES HEADER & SORTER ↑↑-->
-
-                            <!-- ↓↓ NOTES LIST ↓↓ -->
-                            <table>
-                                <?php foreach ($rows as $row): ?>
-                                    <tr>
-                                    <td onclick="window.location.href='?note=<?= $row['note_id']; ?><?php if (isset($_GET['sort']) && $_GET['sort'] != 'id_asc'): ?>&sort=<?= htmlspecialchars($_GET['sort']); ?><?php endif;if (isset($_GET['search']) && $_GET['search'] != ''): ?>&search=<?= htmlspecialchars($_GET['search']); ?><?php endif ?>'">
-                                            <h3><?= htmlspecialchars($row['note_title']); ?></h3>
-                                            <br>
-                                            <?= htmlspecialchars(substr($row['note_content'], 0, 40)) . (strlen($row['note_content']) > 40 ? '...' : ''); ?>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </table>
-                            <!-- ↑↑ NOTES LIST ↑↑ -->
-                        </div>
-                        <!-- ↑↑ NOTES SECTION ↑↑ -->
-
-                        <!-- ↓↓ WRITE SECTION ↓↓ -->
+            <?php if (isset($_GET['unlocked'])): ?>
+                <div class="container">
+                    <!-- ↓↓ SIDE BAR BUTTONS ↓↓ -->
+                    <div class="sidebar">
+                        <!-- NEW PAGE -->
                         <?php if (isset($_GET['newpage'])): ?>
-                            <!-- NEW PAGE -->
-                            <div class="write-section">
-                                <input type="text" id="Title" placeholder="Title" required>
-                                <textarea id="Content" required></textarea>
-                            </div>
+                            <button type="button" onclick="submitData()">Save</button>
+                            <button onclick="back()">Cancel</button>
 
+                        <!-- NOTE -->
                         <?php elseif (isset($_GET['note'])): ?>
-                            <!-- NOTES -->
-                            <div class="write-section">
-                                <?php foreach ($datas as $data): ?>
-                                    <h3><?= $data['note_title']?></h3>
-                                    <p style="word-wrap: break-word; overflow-wrap: break-word; max-width: 390px;"><?= $data['note_content']?></p>
-                                <?php endforeach ?>
-                            </div>
+                            <button type="button" onclick="editData(<?= $_GET['note'] ?>)">Edit</button>
+                            <button type="button" onclick="deleteData(<?= $_GET['note'] ?>)">Delete</button>
+                            <button onclick="back()">Back</button>
 
+                        <!-- EDIT -->
                         <?php elseif (isset($_GET['edit'])): ?>
-                            <!-- EDIT -->
-                            <div class="write-section">
-                                <input type="text" id="Title" value="<?php echo htmlspecialchars($title); ?>" required>
-                                <textarea id="Content" required><?php echo htmlspecialchars_decode($content); ?></textarea>
-                            </div>
+                            <button type="button" onclick="updateData(<?= $_GET['edit'] ?>)">Save</button>
+                            <button onclick="cancelEdit(<?= $_GET['edit'] ?>)">Cancel</button>
 
+                        <!-- DEFAULT -->
                         <?php else: ?>
-                            <!-- DEFAULT -->
-                            <div class="write-section">
-                                <h2>Write your ideas</h2>
-                            </div>
+                            <button onclick="newPage()">New</button>
                         <?php endif; ?>
-                        <!-- ↑↑ WRITE SECTION ↑↑ -->
+                    </div>
+                    <!-- ↑↑ SIDE BAR BUTTONS ↑↑ -->
+
+                    <!-- ↓↓ MAIN CONTENTS ↓↓ -->
+                    <div class="main-content">
+
+                        <!-- ↓↓ HEADER ↓↓ -->
+                        <div class="header">
+                            <input type="search" id="searchInput" placeholder="Search" value="<?= isset($_GET['search']) ? $_GET['search'] : ''; ?>">
+                        </div>
+                        <!-- ↑↑ HEADER ↑↑ -->
+
+                        <div class="notes-section">
+                            <!-- ↓↓ NOTES SECTION ↓↓ -->
+                            <div class="notes-list">
+                                <!-- ↓↓ NOTES HEADER & SORTER ↓↓-->
+                                <div class="notes-list-header">
+                                    <div style="flex-grow: 1">
+                                        <h2>Notes</h2>
+                                    </div>
+
+                                    <div style="flex-grow: 1; text-align: right;">
+                                        <form>
+                                            <label for="sort">Sort By:</label>
+                                            <select name="sort" id="sort" onchange="sortBy(this)">
+                                                <option value="id_asc" <?= ($_GET['sort'] ?? '') === 'id_asc' ? 'selected' : ''; ?>>ID↑</option>
+                                                <option value="id_desc" <?= ($_GET['sort'] ?? '') === 'id_desc' ? 'selected' : ''; ?>>ID↓</option>
+                                                <option value="t_asc" <?= ($_GET['sort'] ?? '') === 't_asc' ? 'selected' : ''; ?>>Title↑</option>
+                                                <option value="t_desc" <?= ($_GET['sort'] ?? '') === 't_desc' ? 'selected' : ''; ?>>Title↓</option>
+                                            </select>
+                                        </form>
+                                    </div>
+                                </div>
+                                <!-- ↑↑ NOTES HEADER & SORTER ↑↑-->
+
+                                <!-- ↓↓ NOTES LIST ↓↓ -->
+                                <table>
+                                    <?php foreach ($rows as $row): ?>
+                                        <tr>
+                                        <td onclick="loadNote(<?= $row['note_id'] ?>)">
+                                                <h3><?= htmlspecialchars($row['note_title']); ?></h3>
+                                                <br>
+                                                <?= htmlspecialchars(substr($row['note_content'], 0, 40)) . (strlen($row['note_content']) > 40 ? '...' : ''); ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </table>
+                                <!-- ↑↑ NOTES LIST ↑↑ -->
+                            </div>
+                            <!-- ↑↑ NOTES SECTION ↑↑ -->
+
+                            <!-- ↓↓ WRITE SECTION ↓↓ -->
+                            <?php if (isset($_GET['newpage'])): ?>
+                                <!-- NEW PAGE -->
+                                <div class="write-section">
+                                    <input type="text" id="Title" placeholder="Title" required>
+                                    <textarea id="Content" required></textarea>
+                                </div>
+
+                            <?php elseif (isset($_GET['note'])): ?>
+                                <!-- NOTES -->
+                                <div class="write-section">
+                                    <?php foreach ($datas as $data): ?>
+                                        <h3><?= $data['note_title']?></h3>
+                                        <p style="word-wrap: break-word; overflow-wrap: break-word; max-width: 390px;"><?= $data['note_content']?></p>
+                                    <?php endforeach ?>
+                                </div>
+
+                            <?php elseif (isset($_GET['edit'])): ?>
+                                <!-- EDIT -->
+                                <div class="write-section">
+                                    <input type="text" id="Title" value="<?php echo htmlspecialchars($title); ?>" required>
+                                    <textarea id="Content" required><?php echo htmlspecialchars_decode($content); ?></textarea>
+                                </div>
+
+                            <?php else: ?>
+                                <!-- DEFAULT -->
+                                <div class="write-section">
+                                    <h2>Write your ideas</h2>
+                                </div>
+                            <?php endif; ?>
+                            <!-- ↑↑ WRITE SECTION ↑↑ -->
+                        </div>
                     </div>
                 </div>
-            </div>
-            <!-- ↑↑ MAIN CONTENTS ↑↑ -->
+                <!-- ↑↑ MAIN CONTENTS ↑↑ -->
 
+            <?php else: ?>
+                <!-- Dito yung Login Page -->
+            <?php endif ?>
         </body>
     </html>
 
     <script>
+        // ↓↓ LOADS SELECTED NOTE ↓↓ \\
+        function loadNote(noteID) {
+            const url = new URL(window.location.href);
+
+            url.searchParams.set('note', noteID);
+            window.location.href = url.toString();
+        }
+        // ↑↑ LOADS SELECTED NOTE ↑↑ \\
+
+        // ↓↓ ENABLES NOTE CREATION ↓↓ \\
+        function newPage() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('newpage', "true");
+            window.location.href = url.toString();
+        }
+        // ↑↑ ENABLES NOTE CREATION ↑↑ \\
+
         // ↓↓ UPLOAD NOTE ↓↓ \\
         function submitData() {
             const titleInput = document.getElementById('Title').value;
@@ -457,7 +478,15 @@
         // ↓↓ BACK FUNCTION ↓↓ \\
         function back() {
             const url = new URL(window.location.href);
-            url.searchParams.delete('note');
+
+            if (url.searchParams.has('note')) {
+                url.searchParams.delete('note');
+            }
+
+            if (url.searchParams.has('newpage')) {
+                url.searchParams.delete('newpage');
+            }
+
             window.location.href = url.toString();
         }
         // ↑↑ BACK FUNCTION ↑↑ \\
