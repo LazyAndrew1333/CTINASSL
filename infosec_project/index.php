@@ -456,7 +456,7 @@
                                 <label for="notes-app-password">Password</label>
                                 <input type="password" id="notes-app-password" name="password" placeholder="Enter your password" required>
                             </div>
-                            <button type="button" id="login-button" onclick="login()">Login</button>
+                            <button type="button" id="login-button" onclick="login(document.getElementById('notes-app-username').value, document.getElementById('notes-app-password').value)">Login</button>
                             <div class="helper-links">
                                 <a href="/register">Create an Account</a>
                             </div>
@@ -474,8 +474,9 @@
 
     <script>
         // LOG IN BUTTON \\
-        function login() {
-            if (true) {
+        function login(username, password) {
+
+            if (username === "root" && password === "admin") {
                 const url = new URL(window.location.href);
 
                 url.searchParams.set('unlocked', 'true');
@@ -640,4 +641,5 @@
             }
         });
         // ↑↑ SEARCH NOTES LIST ↑↑ \\
+
     </script>
