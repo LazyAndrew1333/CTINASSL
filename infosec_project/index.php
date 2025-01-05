@@ -11,6 +11,89 @@
                     box-sizing: border-box;
                 }
 
+
+                /* LOG IN PAGE */
+
+                    .login-wrapper {
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100vh;
+                    background-color: #f0f0f0;
+                    font-family: Arial, sans-serif;
+                }
+
+                #login-section {
+                    text-align: center;
+                    padding: 30px;
+                    background: #fff;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                    max-width: 350px;
+                }
+
+                #login-section h2 {
+                    margin-bottom: 20px;
+                    color: #333;
+                }
+
+                .form-group {
+                    margin-bottom: 15px;
+                    text-align: left;
+                }
+
+                label {
+                    display: block;
+                    margin-bottom: 5px;
+                    color: #555;
+                }
+
+                input {
+                    width: 100%;
+                    padding: 10px;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    box-sizing: border-box;
+                }
+
+                input:focus {
+                    outline: none;
+                    border-color: #4CAF50;
+                }
+
+                #login-button {
+                    background-color: #4CAF50;
+                    color: white;
+                    padding: 10px 20px;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 16px;
+                    width: 100%;
+                    margin-top: 10px;
+                }
+
+                #login-button:hover {
+                    background-color: #45a049;
+                }
+
+                .helper-links {
+                    margin-top: 15px;
+                }
+
+                .helper-links a {
+                    color: #4CAF50;
+                    text-decoration: none;
+                    font-size: 14px;
+                }
+
+                .helper-links a:hover {
+                    text-decoration: underline;
+                }
+
+                /* LOG IN PAGE */
+
+
                 /* ↓↓ HIDE SCROLLBAR ↓↓ */
                 body, html {
                     overflow: hidden;
@@ -100,7 +183,7 @@
                     background: #fafafa;
                     transition: background 0.5s;
                 }
-                
+
                 .notes-list td:hover {
                     background: #ddd;
                 }
@@ -145,7 +228,7 @@
                 }
             </style>
         </head>
-        
+
         <?php
             // ↓↓ Establish DB Connection ↓↓ \\
             $host = 'localhost';
@@ -187,7 +270,7 @@
                         ],
                     ],
                 ];
-            
+
                 foreach ($queries as $query) {
                     if ($query['condition']) {
                         $stmt = $pdo->prepare($query['sql']);
@@ -241,12 +324,12 @@
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute(['nid' => $nid]);
                 $row = $stmt->fetch();
-            
+
                 [$title, $content] = $row ? [$row['note_title'], $row['note_content']] : ["", ""];
             }            
             // ↑↑ EDIT SELECTED NOTES ↑↑ \\
         ?>
-        
+
         <body>
             <?php if (isset($_GET['unlocked'])): ?>
                 <div class="container">
@@ -360,12 +443,47 @@
                 <!-- ↑↑ MAIN CONTENTS ↑↑ -->
 
             <?php else: ?>
-                <!-- Dito yung Login Page -->
+                <!-- LOG IN PAGE -->
+                <div class="login-wrapper">
+                    <div id="login-section">
+                        <h2>Login to Notes App</h2>
+                        <form id="notes-app-login-form" action="/login" method="POST">
+                            <div class="form-group">
+                                <label for="notes-app-username">Username</label>
+                                <input type="text" id="notes-app-username" name="username" placeholder="Enter your username" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="notes-app-password">Password</label>
+                                <input type="password" id="notes-app-password" name="password" placeholder="Enter your password" required>
+                            </div>
+                            <button type="button" id="login-button" onclick="login()">Login</button>
+                            <div class="helper-links">
+                                <a href="/register">Create an Account</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
             <?php endif ?>
+
+
         </body>
     </html>
 
+
+
     <script>
+        // LOG IN BUTTON \\
+        function login() {
+            if (true) {
+                const url = new URL(window.location.href);
+
+                url.searchParams.set('unlocked', 'true');
+                window.location.href = url.toString();
+            }
+        }
+        // LOG IN BUTTON \\
+
         // ↓↓ LOADS SELECTED NOTE ↓↓ \\
         function loadNote(noteID) {
             const url = new URL(window.location.href);
@@ -387,6 +505,7 @@
         function submitData() {
             const titleInput = document.getElementById('Title').value;
             const contentInput = document.getElementById('Content').value;
+            const url = new URL(window.location.href);
 
             const formData = new FormData();
             formData.append('title', titleInput);
@@ -399,7 +518,8 @@
             .then(response => response.text())
             .then(result => {
                 console.log('Success:', result);
-                window.location.href = '/infosec_project/';
+                url.searchParams.delete('newpage');
+                window.location.href = url.toString();
             })
             .catch(error => {
                 console.error('Error:', error);
