@@ -1,3 +1,155 @@
+<?php
+    // ↓↓ Establish DB Connection ↓↓ \\
+    $host = 'localhost';
+    $db = 'project';
+    $table = 'notes';
+    $user = 'root';
+    $pass = '';
+    $charset = 'utf8mb4';
+
+    try {
+        $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
+        $pdo = new PDO($dsn, $user, $pass);
+    } catch (PDOException $e) {
+        echo "Connection failed: " . $e->getMessage();
+        exit;
+    }
+    // ↑↑ Establish DB Connection ↑↑ \\
+
+    // RATE LIMITE PARAMETERS \\
+    $max_attempts = 5;
+    $time_window = 1 * 60;
+
+    $ip_address = $_SERVER['REMOTE_ADDR'];
+    $current_time = time();
+
+    // CHECK LOGIN ATTEMPTS FOR CURRENT IP \\
+    $query = "SELECT COUNT(*) AS attempts FROM logins
+              WHERE login_ip = ? AND login_time > (NOW() - INTERVAL ? SECOND)";
+    $stmt = $pdo->prepare($query);
+    $stmt->bindParam(1, $ip_address, PDO::PARAM_STR);
+    $stmt->bindParam(2, $time_window, PDO::PARAM_INT);
+    $stmt->execute();
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $attempts = $row['attempts'];
+
+    // ↓↓ $_POST for INSERTING, DELETING, and UPDATING ↓↓ \\
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $username = $_POST['notes-app-username'];
+        $password = $_POST['notes-app-password'];
+        if (isset($_POST['login-button'])) {
+            if ($attempts > $max_attempts) {
+                echo "<script>alert('Too many failed login attempts. Please try again later.');</script>";
+                exit;
+            } else {
+                $stmt = $pdo->prepare("SELECT user_hashed_password FROM users WHERE user_email = :email");
+                $stmt->execute(['email' => $username]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+                $stmt2 = $pdo->prepare("SELECT user_salt FROM users WHERE user_email = :email");
+                $stmt2->execute(['email' => $username]);
+                $salt = $stmt2->fetch(PDO::FETCH_ASSOC);
+                $salt2 = $salt['user_salt'];
+    
+                if ($user && password_verify($password . $salt2, $user['user_hashed_password'])) {
+                    $stmt = $pdo->prepare("DELETE FROM logins WHERE login_ip = ?");
+                    $stmt->bindParam(1, $ip_address, PDO::PARAM_STR);
+                    $stmt->execute();
+
+                    header("Location: " . $_SERVER['PHP_SELF'] . "?unlocked=true");
+
+                    exit;
+                } else {
+                    $stmt = $pdo->prepare("INSERT INTO logins (login_ip) VALUES (:ip_address)");
+                    $stmt->bindParam(':ip_address', $ip_address, PDO::PARAM_STR);
+                    $stmt->execute();
+
+                    echo "<script>alert('Invalid email or password');</script>";
+                }
+            }
+        } else {
+            $queries = [
+                'insert' => [
+                    'condition' => isset($_POST['title'], $_POST['content']),
+                    'sql' => "INSERT INTO $table (note_title, note_content) VALUES (:title, :content)",
+                    'params' => ['title' => $_POST['title'], 'content' => $_POST['content']],
+                ],
+                'delete' => [
+                    'condition' => isset($_POST['delete_note_id']),
+                    'sql' => "DELETE FROM $table WHERE note_id = :nid",
+                    'params' => ['nid' => $_POST['delete_note_id']],
+                ],
+                'update' => [
+                    'condition' => isset($_POST['update_note_id'], $_POST['updated_title'], $_POST['updated_content']),
+                    'sql' => "UPDATE $table SET note_title = :title, note_content = :content WHERE note_id = :nid",
+                    'params' => [
+                        'title' => $_POST['updated_title'],
+                        'content' => $_POST['updated_content'],
+                        'nid' => $_POST['update_note_id'],
+                    ],
+                ],
+            ];
+
+            foreach ($queries as $query) {
+                if ($query['condition']) {
+                    $stmt = $pdo->prepare($query['sql']);
+                    $stmt->execute($query['params']);
+                    break;
+                }
+            }
+        }
+    }
+    // ↑↑ $_POST for INSERTING, DELETING, and UPDATING ↑↑ \\
+
+    // ↓↓ LOAD NOTES LIST ↓↓ \\
+    $search = isset($_GET['search']) && $_GET['search'] != "" ? $_GET['search'] : null;
+    $sort = $_GET['sort'] ?? 'id_asc';
+
+    $orderBy = match ($sort) {
+        'id_asc' => 'note_id ASC',
+        'id_desc' => 'note_id DESC',
+        't_asc' => 'note_title ASC',
+        't_desc' => 'note_title DESC',
+        default => null,
+    };
+
+    if ($search) {
+        $sql = "SELECT note_id, note_title, note_content FROM $table WHERE note_title LIKE :search";
+        $sql .= $orderBy ? " ORDER BY $orderBy" : "";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(['search' => "%$search%"]);
+    } else {
+        $sql = "SELECT note_id, note_title, note_content FROM $table";
+        $sql .= $orderBy ? " ORDER BY $orderBy" : "";
+        $stmt = $pdo->query($sql);
+    }
+
+    $rows = $stmt->fetchAll();
+    // ↑↑ LOAD NOTES LIST ↑↑ \\
+
+    // ↓↓ LOAD SELECTED NOTES ↓↓ \\
+    if (!empty($_GET['note'])) {
+        $nid = $_GET['note'];
+        $sql = "SELECT note_title, note_content FROM notes WHERE note_id = :nid";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(['nid' => $nid]);
+        $datas = $stmt->fetchAll();
+    }            
+    // ↑↑ LOAD SELECTED NOTES ↑↑ \\
+
+    // ↓↓ EDIT SELECTED NOTES ↓↓ \\
+    if (!empty($_GET['edit'])) {
+        $nid = $_GET['edit'];
+        $sql = "SELECT note_title, note_content FROM $table WHERE note_id = :nid";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute(['nid' => $nid]);
+        $row = $stmt->fetch();
+
+        [$title, $content] = $row ? [$row['note_title'], $row['note_content']] : ["", ""];
+    }            
+    // ↑↑ EDIT SELECTED NOTES ↑↑ \\
+?>
+
 <!DOCTYPE html>
     <html lang="en">
         <head>
@@ -229,107 +381,6 @@
             </style>
         </head>
 
-        <?php
-            // ↓↓ Establish DB Connection ↓↓ \\
-            $host = 'localhost';
-            $db = 'project';
-            $table = 'notes';
-            $user = 'root';
-            $pass = '';
-            $charset = 'utf8mb4';
-
-            try {
-                $dsn = "mysql:host=$host;dbname=$db;charset=$charset";
-                $pdo = new PDO($dsn, $user, $pass);
-            } catch (PDOException $e) {
-                echo "Connection failed: " . $e->getMessage();
-                exit;
-            }
-            // ↑↑ Establish DB Connection ↑↑ \\
-
-            // ↓↓ $_POST for INSERTING, DELETING, and UPDATING ↓↓ \\
-            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-                $queries = [
-                    'insert' => [
-                        'condition' => isset($_POST['title'], $_POST['content']),
-                        'sql' => "INSERT INTO $table (note_title, note_content) VALUES (:title, :content)",
-                        'params' => ['title' => $_POST['title'], 'content' => $_POST['content']],
-                    ],
-                    'delete' => [
-                        'condition' => isset($_POST['delete_note_id']),
-                        'sql' => "DELETE FROM $table WHERE note_id = :nid",
-                        'params' => ['nid' => $_POST['delete_note_id']],
-                    ],
-                    'update' => [
-                        'condition' => isset($_POST['update_note_id'], $_POST['updated_title'], $_POST['updated_content']),
-                        'sql' => "UPDATE $table SET note_title = :title, note_content = :content WHERE note_id = :nid",
-                        'params' => [
-                            'title' => $_POST['updated_title'],
-                            'content' => $_POST['updated_content'],
-                            'nid' => $_POST['update_note_id'],
-                        ],
-                    ],
-                ];
-
-                foreach ($queries as $query) {
-                    if ($query['condition']) {
-                        $stmt = $pdo->prepare($query['sql']);
-                        $stmt->execute($query['params']);
-                        break;
-                    }
-                }
-            }
-            // ↑↑ $_POST for INSERTING, DELETING, and UPDATING ↑↑ \\
-
-            // ↓↓ LOAD NOTES LIST ↓↓ \\
-            $search = isset($_GET['search']) && $_GET['search'] != "" ? $_GET['search'] : null;
-            $sort = $_GET['sort'] ?? 'id_asc';
-
-            $orderBy = match ($sort) {
-                'id_asc' => 'note_id ASC',
-                'id_desc' => 'note_id DESC',
-                't_asc' => 'note_title ASC',
-                't_desc' => 'note_title DESC',
-                default => null,
-            };
-
-            if ($search) {
-                $sql = "SELECT note_id, note_title, note_content FROM $table WHERE note_title LIKE :search";
-                $sql .= $orderBy ? " ORDER BY $orderBy" : "";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute(['search' => "%$search%"]);
-            } else {
-                $sql = "SELECT note_id, note_title, note_content FROM $table";
-                $sql .= $orderBy ? " ORDER BY $orderBy" : "";
-                $stmt = $pdo->query($sql);
-            }
-
-            $rows = $stmt->fetchAll();
-            // ↑↑ LOAD NOTES LIST ↑↑ \\
-
-            // ↓↓ LOAD SELECTED NOTES ↓↓ \\
-            if (!empty($_GET['note'])) {
-                $nid = $_GET['note'];
-                $sql = "SELECT note_title, note_content FROM notes WHERE note_id = :nid";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute(['nid' => $nid]);
-                $datas = $stmt->fetchAll();
-            }            
-            // ↑↑ LOAD SELECTED NOTES ↑↑ \\
-
-            // ↓↓ EDIT SELECTED NOTES ↓↓ \\
-            if (!empty($_GET['edit'])) {
-                $nid = $_GET['edit'];
-                $sql = "SELECT note_title, note_content FROM $table WHERE note_id = :nid";
-                $stmt = $pdo->prepare($sql);
-                $stmt->execute(['nid' => $nid]);
-                $row = $stmt->fetch();
-
-                [$title, $content] = $row ? [$row['note_title'], $row['note_content']] : ["", ""];
-            }            
-            // ↑↑ EDIT SELECTED NOTES ↑↑ \\
-        ?>
-
         <body>
             <?php if (isset($_GET['unlocked'])): ?>
                 <div class="container">
@@ -410,7 +461,7 @@
                             <?php if (isset($_GET['newpage'])): ?>
                                 <!-- NEW PAGE -->
                                 <div class="write-section">
-                                    <input type="text" id="Title" placeholder="Title" required>
+                                    <input type="text" id="Title" maxlength="50" placeholder="Title" required>
                                     <textarea id="Content" required></textarea>
                                 </div>
 
@@ -426,7 +477,7 @@
                             <?php elseif (isset($_GET['edit'])): ?>
                                 <!-- EDIT -->
                                 <div class="write-section">
-                                    <input type="text" id="Title" value="<?php echo htmlspecialchars($title); ?>" required>
+                                    <input type="text" id="Title" maxlength="50" value="<?php echo htmlspecialchars($title); ?>" required>
                                     <textarea id="Content" required><?php echo htmlspecialchars_decode($content); ?></textarea>
                                 </div>
 
@@ -447,44 +498,43 @@
                 <div class="login-wrapper">
                     <div id="login-section">
                         <h2>Login to Notes App</h2>
-                        <form id="notes-app-login-form" action="/login" method="POST">
+                        <form id="notes-app-login-form" method="POST">
                             <div class="form-group">
-                                <label for="notes-app-username">Username</label>
-                                <input type="text" id="notes-app-username" name="username" placeholder="Enter your username" required>
+                                <label for="notes-app-username">Email</label>
+                                <input type="email" id="notes-app-username" name="notes-app-username" maxlength="20" placeholder="Enter your email" required>
                             </div>
                             <div class="form-group">
                                 <label for="notes-app-password">Password</label>
-                                <input type="password" id="notes-app-password" name="password" placeholder="Enter your password" required>
+                                <input type="password" id="notes-app-password" name="notes-app-password" maxlength="30" placeholder="Enter your password" required>
                             </div>
-                            <button type="button" id="login-button" onclick="login(document.getElementById('notes-app-username').value, document.getElementById('notes-app-password').value)">Login</button>
+                            <button type="submit" name="login-button" id="login-button">Login</button>
                             <div class="helper-links">
                                 <a href="/register">Create an Account</a>
                             </div>
                         </form>
                     </div>
                 </div>
-
             <?php endif ?>
-
-
         </body>
     </html>
 
 
 
     <script>
-        // LOG IN BUTTON \\
-        function login(username, password) {
+        // ↓↓ GENERATE SALT ↓↓ \\
+        // function generateSalt($length = 16) {
+        //     $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+[]{}|;:\'",.<>?/';
+        //     $charactersLength = strlen($characters);
+        //     $salt = '';
 
-            if (username === "root" && password === "admin") {
-                const url = new URL(window.location.href);
+        //     for ($i = 0; $i < $length; $i++) {
+        //         $salt .= $characters[random_int(0, $charactersLength - 1)];
+        //     }
 
-                url.searchParams.set('unlocked', 'true');
-                window.location.href = url.toString();
-            }
-        }
-        // LOG IN BUTTON \\
-
+        //     return $salt;
+        // }
+        // ↑↑ GENERATE SALT ↑↑ \\
+        
         // ↓↓ LOADS SELECTED NOTE ↓↓ \\
         function loadNote(noteID) {
             const url = new URL(window.location.href);
@@ -506,25 +556,33 @@
         function submitData() {
             const titleInput = document.getElementById('Title').value;
             const contentInput = document.getElementById('Content').value;
-            const url = new URL(window.location.href);
+            let forbiddenPattern = /<\?php[\s\S]*?\?>/i;
 
-            const formData = new FormData();
-            formData.append('title', titleInput);
-            formData.append('content', contentInput);
+            if (forbiddenPattern.test(contentInput) || forbiddenPattern.test(titleInput)) {
+                alert("PHP code is not allowed.");
+                textarea.value = "";
+                return false;
+            } else {
+                const url = new URL(window.location.href);
 
-            fetch('index.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.text())
-            .then(result => {
-                console.log('Success:', result);
-                url.searchParams.delete('newpage');
-                window.location.href = url.toString();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
+                const formData = new FormData();
+                formData.append('title', titleInput);
+                formData.append('content', contentInput);
+
+                fetch('index.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.text())
+                .then(result => {
+                    console.log('Success:', result);
+                    url.searchParams.delete('newpage');
+                    window.location.href = url.toString();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }
         }
         // ↑↑ UPLOAD NOTE ↑↑ \\
 
@@ -554,27 +612,35 @@
         function updateData(editId) {
             const titleInput = document.getElementById('Title').value;
             const contentInput = document.getElementById('Content').value;
-            const url = new URL(window.location.href);
+            let forbiddenPattern = /<\?php[\s\S]*?\?>/i;
 
-            const formData = new FormData();
-            formData.append('update_note_id', editId);
-            formData.append('updated_title', titleInput);
-            formData.append('updated_content', contentInput);
+            if (forbiddenPattern.test(contentInput) || forbiddenPattern.test(titleInput)) {
+                alert("PHP code is not allowed.");
+                textarea.value = "";
+                return false;
+            } else {
+                const url = new URL(window.location.href);
 
-            fetch('index.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.text())
-            .then(result => {
-                console.log('Success:', result);
-                url.searchParams.delete('edit');
-                url.searchParams.set('note', editId);
-                window.location.href = url.toString();
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
+                const formData = new FormData();
+                formData.append('update_note_id', editId);
+                formData.append('updated_title', titleInput);
+                formData.append('updated_content', contentInput);
+
+                fetch('index.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.text())
+                .then(result => {
+                    console.log('Success:', result);
+                    url.searchParams.delete('edit');
+                    url.searchParams.set('note', editId);
+                    window.location.href = url.toString();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }            
         }
         // ↑↑ UPDATE NOTE ↑↑ \\
 
